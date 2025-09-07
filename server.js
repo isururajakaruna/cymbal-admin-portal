@@ -32,7 +32,15 @@ const requireAuth = (req, res, next) => {
   if (req.session.isAuthenticated) {
     next();
   } else {
-    res.redirect('/login');
+    // For API routes, return 401, for page routes, redirect to login
+    if (req.path.startsWith('/api/')) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'Authentication required' 
+      });
+    } else {
+      res.redirect('/login');
+    }
   }
 };
 
@@ -124,6 +132,112 @@ app.get('/api/files', requireAuth, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch files' 
+    });
+  }
+});
+
+// API route to download a file
+app.get('/api/files/download', requireAuth, async (req, res) => {
+  try {
+    const filename = req.query.filename;
+    
+    if (!filename) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Filename is required' 
+      });
+    }
+
+    // Forward the download request to RAG API
+    const response = await axios.get(`${RAG_API_BASE_URL}/api/v1/files/view`, {
+      params: { filename },
+      responseType: 'stream'
+    });
+
+    // Set appropriate headers for file download
+    res.set({
+      'Content-Type': response.headers['content-type'] || 'application/octet-stream',
+      'Content-Disposition': response.headers['content-disposition'] || `attachment; filename="${filename}"`,
+      'Content-Length': response.headers['content-length']
+    });
+
+    // Handle errors in the stream
+    response.data.on('error', (error) => {
+      console.error('Stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          success: false, 
+          error: 'Error downloading file' 
+        });
+      }
+    });
+
+    // Pipe the file stream to the response
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error('Error downloading file:', error.message);
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to download file' 
+      });
+    }
+  }
+});
+
+// API route to delete a file
+app.delete('/api/files/delete', requireAuth, async (req, res) => {
+  try {
+    const filename = req.query.filename;
+    
+    if (!filename) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Filename is required' 
+      });
+    }
+
+    // Forward the delete request to RAG API
+    const response = await axios.delete(`${RAG_API_BASE_URL}/api/v1/upload/delete`, {
+      params: { filename }
+    });
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('Error deleting file:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete file' 
+    });
+  }
+});
+
+// API route to get file embedding stats
+app.get('/api/files/stats', requireAuth, async (req, res) => {
+  try {
+    const filename = req.query.filename;
+    
+    if (!filename) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Filename is required' 
+      });
+    }
+
+    // Forward the stats request to RAG API
+    const response = await axios.get(`${RAG_API_BASE_URL}/api/v1/files/embedding-stats`, {
+      params: { filename }
+    });
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('Error fetching file stats:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch file statistics' 
     });
   }
 });

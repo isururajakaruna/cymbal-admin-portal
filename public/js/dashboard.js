@@ -7,6 +7,14 @@ $(document).ready(function() {
     
     // Initialize search functionality
     initializeSearch();
+    
+    // Handle delete confirmation
+    $('#confirmDeleteBtn').on('click', function() {
+        if (fileToDelete) {
+            performDelete(fileToDelete);
+            $('#deleteConfirmModal').modal('hide');
+        }
+    });
 });
 
 let allTags = [];
@@ -194,6 +202,9 @@ function generateFileCard(file) {
                                     <li><a class="dropdown-item" href="#" onclick="downloadFile('${file.name}')">
                                         <i class="bi bi-download me-2"></i>Download
                                     </a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="viewFileStats('${file.name}')">
+                                        <i class="bi bi-graph-up me-2"></i>View File Stats
+                                    </a></li>
                                     <li><a class="dropdown-item" href="#" onclick="replaceFile('${file.name}')">
                                         <i class="bi bi-arrow-clockwise me-2"></i>Replace
                                     </a></li>
@@ -300,6 +311,50 @@ function hideLoading() {
     $('.loading-spinner').hide();
 }
 
+// Toast notification system
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('toast');
+    const toastIcon = document.getElementById('toastIcon');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastMessage = document.getElementById('toastMessage');
+    
+    // Set icon and title based on type
+    let iconClass, title, bgClass;
+    switch(type) {
+        case 'success':
+            iconClass = 'bi-check-circle-fill text-success';
+            title = 'Success';
+            bgClass = 'bg-success';
+            break;
+        case 'error':
+            iconClass = 'bi-exclamation-triangle-fill text-danger';
+            title = 'Error';
+            bgClass = 'bg-danger';
+            break;
+        case 'warning':
+            iconClass = 'bi-exclamation-triangle-fill text-warning';
+            title = 'Warning';
+            bgClass = 'bg-warning';
+            break;
+        default:
+            iconClass = 'bi-info-circle-fill text-info';
+            title = 'Info';
+            bgClass = 'bg-info';
+    }
+    
+    // Update toast content
+    toastIcon.className = `${iconClass} me-2`;
+    toastTitle.textContent = title;
+    toastMessage.textContent = message;
+    
+    // Show toast
+    const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: type === 'error' ? 5000 : 3000
+    });
+    bsToast.show();
+}
+
 // Helper functions for file card generation
 function getFileIcon(fileType, fileName) {
     // Check filename extension first (more reliable)
@@ -377,36 +432,264 @@ function formatDate(dateString) {
 }
 
 function downloadFile(filename) {
-    window.open(`/api/files/download?filename=${encodeURIComponent(filename)}`, '_blank');
+    showLoading();
+    
+    // Use fetch API for better error handling
+    fetch(`/api/files/download?filename=${encodeURIComponent(filename)}`, {
+        method: 'GET',
+        headers: {
+            'Accept': '*/*'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // Get the filename from Content-Disposition header or use the original
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let downloadFilename = filename;
+        
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+            if (filenameMatch) {
+                downloadFilename = filenameMatch[1];
+            }
+        }
+        
+        // Convert response to blob and return both blob and filename
+        return response.blob().then(blob => ({
+            blob: blob,
+            filename: downloadFilename
+        }));
+    })
+    .then(({ blob, filename: downloadFilename }) => {
+        hideLoading();
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = downloadFilename;
+        link.style.display = 'none';
+        
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up
+        window.URL.revokeObjectURL(url);
+        
+        showToast('File downloaded successfully', 'success');
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Download error:', error);
+        showToast('Failed to download file: ' + error.message, 'error');
+    });
+}
+
+let fileToDelete = null;
+
+function deleteFile(filename) {
+    // Store the filename to delete
+    fileToDelete = filename;
+    
+    // Update the modal content
+    $('#deleteFileName').text(filename);
+    
+    // Show the confirmation modal
+    $('#deleteConfirmModal').modal('show');
+}
+
+// Handle delete confirmation (moved to main document.ready)
+
+function performDelete(filename) {
+    showLoading();
+    
+    $.ajax({
+        url: `/api/files/delete?filename=${encodeURIComponent(filename)}`,
+        method: 'DELETE',
+        success: function(response) {
+            hideLoading();
+            if (response.success) {
+                showToast(`File "${filename}" deleted successfully`, 'success');
+                // Reload the file list without full page reload
+                loadFiles();
+            } else {
+                showToast(response.error || 'Failed to delete file', 'error');
+            }
+        },
+        error: function(xhr, status, error) {
+            hideLoading();
+            console.error('Delete error:', error);
+            const errorMessage = xhr.responseJSON?.error || 'Failed to delete file';
+            showToast(errorMessage, 'error');
+        }
+    });
+}
+
+function loadFiles() {
+    showLoading();
+    
+    // Get current search parameters
+    const searchParams = {
+        search: currentFilters.query,
+        sort_by: 'date',
+        limit: 1000,
+        offset: 0
+    };
+    
+    // Add tags if any are selected
+    if (currentFilters.tags.length > 0) {
+        searchParams.tags = currentFilters.tags.join(',');
+    }
+    
+    $.ajax({
+        url: '/api/files',
+        method: 'GET',
+        data: searchParams,
+        success: function(data) {
+            hideLoading();
+            displaySearchResults(data);
+            updateFilterIndicators();
+        },
+        error: function(xhr, status, error) {
+            hideLoading();
+            console.error('Error loading files:', error);
+            showToast('Failed to load files', 'error');
+        }
+    });
 }
 
 function replaceFile(filename) {
-    // TODO: Implement replace functionality
-    alert('Replace functionality will be implemented in the next phase');
+    // TODO: Implement file replace functionality
+    showToast('Replace functionality coming soon', 'info');
 }
 
-function deleteFile(filename) {
-    if (confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
-        showLoading();
-        
-        $.ajax({
-            url: `/api/files/${encodeURIComponent(filename)}`,
-            method: 'DELETE',
-            success: function(data) {
-                hideLoading();
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Error deleting file: ' + (data.error || 'Unknown error'));
-                }
-            },
-            error: function(xhr, status, error) {
-                hideLoading();
-                console.error('Error:', error);
-                alert('Error deleting file. Please try again.');
+function viewFileStats(filename) {
+    showLoading();
+    
+    $.ajax({
+        url: '/api/files/stats',
+        method: 'GET',
+        data: { filename: filename },
+        success: function(response) {
+            hideLoading();
+            if (response.success) {
+                displayFileStats(response);
+                $('#fileStatsModal').modal('show');
+            } else {
+                showToast(response.error || 'Failed to load file statistics', 'error');
             }
-        });
+        },
+        error: function(xhr, status, error) {
+            hideLoading();
+            console.error('Stats error:', error);
+            const errorMessage = xhr.responseJSON?.error || 'Failed to load file statistics';
+            showToast(errorMessage, 'error');
+        }
+    });
+}
+
+function displayFileStats(data) {
+    const content = $('#fileStatsContent');
+    const fileInfo = data.file_info;
+    const embeddingStats = data.embedding_stats;
+    
+    let html = `
+        <div class="row">
+            <!-- File Information -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-file-earmark me-2"></i>File Information</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Name:</strong><br>
+                            <span class="text-muted">${fileInfo.name}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Type:</strong><br>
+                            <span class="text-muted">${fileInfo.file_type || 'Unknown'}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Size:</strong><br>
+                            <span class="text-muted">${formatFileSize(fileInfo.size)}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Last Updated:</strong><br>
+                            <span class="text-muted">${formatDate(fileInfo.last_updated)}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Path:</strong><br>
+                            <span class="text-muted small">${fileInfo.path}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Embedding Statistics -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Embedding Statistics</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Total Embeddings:</strong>
+                                <span class="badge bg-primary fs-6">${embeddingStats.total_embeddings}</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Has Embeddings:</strong>
+                                <span class="badge ${embeddingStats.has_embeddings ? 'bg-success' : 'bg-warning'}">
+                                    ${embeddingStats.has_embeddings ? 'Yes' : 'No'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Status:</strong><br>
+                            <span class="text-muted">${data.message}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add datapoint IDs section if available
+    if (embeddingStats.datapoint_ids && embeddingStats.datapoint_ids.length > 0) {
+        html += `
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Datapoint IDs (${embeddingStats.datapoint_ids.length})</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                ${embeddingStats.datapoint_ids.map((id, index) => `
+                                    <div class="col-md-6 col-lg-4 mb-2">
+                                        <div class="p-2 bg-light rounded">
+                                            <small class="text-muted">${index + 1}.</small> 
+                                            <code class="small">${id}</code>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
+    
+    content.html(html);
 }
 
 // Refresh files list
