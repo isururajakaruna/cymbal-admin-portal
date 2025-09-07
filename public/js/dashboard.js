@@ -181,15 +181,15 @@ function generateFileCard(file) {
     
     return `
         <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card file-card h-100">
+            <div class="card file-card h-100" title="${file.name}">
                 <div class="card-body">
                     <div class="d-flex align-items-start mb-3">
                         <div class="file-icon me-3" style="background: ${fileIconColor}">
                             <i class="${fileIcon}"></i>
                         </div>
                         <div class="flex-grow-1">
-                            <h6 class="card-title mb-1 text-truncate" title="${file.name}">
-                                ${file.name}
+                            <h6 class="card-title mb-1">
+                                <span class="file-name" title="${file.name}">${file.name}</span>
                             </h6>
                             <small class="text-muted">
                                 ${fileSize} • 
@@ -568,9 +568,242 @@ function loadFiles() {
     });
 }
 
+// Replace functionality
+let replaceData = null;
+let fileToReplace = null;
+
 function replaceFile(filename) {
-    // TODO: Implement file replace functionality
-    showToast('Replace functionality coming soon', 'info');
+    fileToReplace = filename;
+    $('#replaceFileName').text(filename);
+    $('#replaceModal').modal('show');
+    initializeReplace();
+}
+
+function initializeReplace() {
+    // Initialize replace tag select2
+    $('#replaceTagSelect').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Select or type tags...',
+        allowClear: true,
+        tags: true,
+        tokenSeparators: [',', ' ']
+    });
+    
+    // Handle file input change
+    $('#replaceFileInput').on('change', function() {
+        const file = this.files[0];
+        if (file) {
+            console.log('File selected for replacement:', file.name);
+            // Reset validation results when new file is selected
+            $('#replaceValidationResults').hide();
+            $('#replaceFileBtn').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i>Replace File').removeClass('btn-warning').addClass('btn-primary');
+        }
+    });
+    
+    // Handle replace button click
+    $('#replaceFileBtn').on('click', function() {
+        replaceFileAction();
+    });
+    
+    // Handle modal close
+    $('#replaceModal').on('hidden.bs.modal', function() {
+        resetReplaceModal();
+    });
+}
+
+function replaceFileAction() {
+    const fileInput = document.getElementById('replaceFileInput');
+    const file = fileInput.files[0];
+    const selectedTags = $('#replaceTagSelect').val() || [];
+    
+    if (!file) {
+        showToast('Please select a file to replace with', 'error');
+        return;
+    }
+    
+    // Disable modal interactions
+    disableReplaceModalInteractions();
+    
+    // Show replace progress
+    $('#replaceProgress').show();
+    updateReplaceProgress(0, 'Preparing replacement...');
+    
+    // Start the realistic progress simulation
+    startReplaceProgress();
+    
+    // Step 1: Delete the existing file
+    console.log('Step 1: Deleting existing file:', fileToReplace);
+    updateReplaceProgress(10, 'Deleting existing file...');
+    
+    $.ajax({
+        url: `/api/files/delete?filename=${encodeURIComponent(fileToReplace)}`,
+        method: 'DELETE',
+        xhrFields: {
+            withCredentials: true
+        },
+        success: function(deleteResponse) {
+            console.log('Delete success:', deleteResponse);
+            // Step 2: Upload the new file
+            uploadReplacementFile(file, selectedTags);
+        },
+        error: function(xhr, status, error) {
+            console.error('Delete error:', error);
+            // Clear the progress interval
+            clearInterval(window.replaceProgressInterval);
+            enableReplaceModalInteractions();
+            hideLoading();
+            $('#replaceProgress').hide();
+            const errorMessage = xhr.responseJSON?.error || 'Failed to delete existing file';
+            showToast(`Delete failed: ${errorMessage}`, 'error');
+        }
+    });
+}
+
+function uploadReplacementFile(file, selectedTags) {
+    console.log('Step 2: Uploading new file:', file.name);
+    updateReplaceProgress(30, 'Uploading new file...');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('replace_existing', 'false'); // Set to false since we already deleted
+    
+    if (selectedTags.length > 0) {
+        formData.append('tags', selectedTags.join(','));
+    }
+    
+    $.ajax({
+        url: '/api/files/upload',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        xhrFields: {
+            withCredentials: true
+        },
+        success: function(response) {
+            console.log('Upload success:', response);
+            // Clear the progress interval
+            clearInterval(window.replaceProgressInterval);
+            updateReplaceProgress(100, 'Replacement completed!');
+            setTimeout(() => {
+                enableReplaceModalInteractions();
+                hideLoading();
+                $('#replaceModal').modal('hide');
+                showToast(`File "${fileToReplace}" replaced successfully with "${response.filename}"!`, 'success');
+                // Reload the page to refresh all statistics and file list
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }, 1000);
+        },
+        error: function(xhr, status, error) {
+            // Clear the progress interval
+            clearInterval(window.replaceProgressInterval);
+            enableReplaceModalInteractions();
+            hideLoading();
+            $('#replaceProgress').hide();
+            console.error('Upload error:', error);
+            console.error('Response:', xhr.responseText);
+            const errorMessage = xhr.responseJSON?.error || 'Failed to upload new file';
+            showToast(`Upload failed: ${errorMessage}`, 'error');
+        }
+    });
+}
+
+function startReplaceProgress() {
+    let progress = 0;
+    const messages = [
+        'Preparing replacement...',
+        'Deleting existing file...',
+        'Uploading new file... This may take a few seconds to a few minutes',
+        'Processing file...',
+        'Validating content...',
+        'Generating embeddings...',
+        'Finalizing replacement...'
+    ];
+    
+    let messageIndex = 0;
+    
+    // Clear any existing interval
+    if (window.replaceProgressInterval) {
+        clearInterval(window.replaceProgressInterval);
+    }
+    
+    window.replaceProgressInterval = setInterval(() => {
+        progress += Math.random() * 2 + 0.5; // Slower increment for two-step process
+        
+        // Update message every 10-12%
+        if (progress > messageIndex * 10 && messageIndex < messages.length - 1) {
+            messageIndex++;
+        }
+        
+        // Cap at 90% to leave room for completion
+        if (progress > 90) {
+            progress = 90;
+        }
+        
+        updateReplaceProgress(Math.round(progress), messages[messageIndex]);
+    }, 1000); // Update every 1000ms for smoother progress
+}
+
+function updateReplaceProgress(percent, status) {
+    $('#replaceProgress .progress-bar').css('width', percent + '%').attr('aria-valuenow', percent);
+    $('#replaceStatus').text(status);
+}
+
+function disableReplaceModalInteractions() {
+    // Disable all buttons and inputs in the replace modal
+    $('#replaceModal .btn').prop('disabled', true);
+    $('#replaceModal input, #replaceModal select').prop('disabled', true);
+    
+    // Add processing class for visual feedback
+    $('#replaceModal .modal-content').addClass('processing');
+    
+    // Disable close button
+    $('#replaceModal .btn-close').prop('disabled', true);
+    
+    // Prevent modal from closing
+    $('#replaceModal').off('hide.bs.modal');
+}
+
+function enableReplaceModalInteractions() {
+    // Re-enable all buttons and inputs
+    $('#replaceModal .btn').prop('disabled', false);
+    $('#replaceModal input, #replaceModal select').prop('disabled', false);
+    
+    // Remove processing class
+    $('#replaceModal .modal-content').removeClass('processing');
+    
+    // Re-enable close button
+    $('#replaceModal .btn-close').prop('disabled', false);
+    
+    // Re-enable modal closing
+    $('#replaceModal').on('hide.bs.modal', function() {
+        resetReplaceModal();
+    });
+}
+
+function resetReplaceModal() {
+    // Clear any progress intervals
+    if (window.replaceProgressInterval) {
+        clearInterval(window.replaceProgressInterval);
+        window.replaceProgressInterval = null;
+    }
+    
+    // Reset form
+    $('#replaceForm')[0].reset();
+    $('#replaceTagSelect').val(null).trigger('change');
+    
+    // Hide sections
+    $('#replaceValidationResults').hide();
+    $('#replaceProgress').hide();
+    
+    // Reset buttons
+    $('#replaceFileBtn').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i>Replace File').removeClass('btn-warning').addClass('btn-primary');
+    
+    // Clear data
+    replaceData = null;
+    fileToReplace = null;
 }
 
 // Upload functionality
@@ -852,6 +1085,9 @@ function performUpload() {
     $('#uploadProgress').show();
     updateUploadProgress(0, 'Preparing upload...');
     
+    // Start the realistic progress simulation
+    startRealisticProgress();
+    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('replace_existing', 'true');
@@ -871,18 +1107,10 @@ function performUpload() {
         xhrFields: {
             withCredentials: true
         },
-        xhr: function() {
-            const xhr = new window.XMLHttpRequest();
-            xhr.upload.addEventListener("progress", function(evt) {
-                if (evt.lengthComputable) {
-                    const percentComplete = Math.round((evt.loaded / evt.total) * 100);
-                    updateUploadProgress(percentComplete, `Uploading... ${percentComplete}%`);
-                }
-            }, false);
-            return xhr;
-        },
         success: function(response) {
             console.log('Upload success:', response);
+            // Clear the progress interval
+            clearInterval(window.progressInterval);
             updateUploadProgress(100, 'Upload completed!');
             setTimeout(() => {
                 enableModalInteractions();
@@ -896,6 +1124,8 @@ function performUpload() {
             }, 1000);
         },
         error: function(xhr, status, error) {
+            // Clear the progress interval
+            clearInterval(window.progressInterval);
             enableModalInteractions();
             hideLoading();
             $('#uploadProgress').hide();
@@ -910,6 +1140,41 @@ function performUpload() {
 function updateUploadProgress(percent, status) {
     $('.progress-bar').css('width', percent + '%').attr('aria-valuenow', percent);
     $('#uploadStatus').text(status);
+}
+
+function startRealisticProgress() {
+    let progress = 0;
+    const messages = [
+        'Preparing upload...',
+        'Uploading file... This may take a few seconds to a few minutes',
+        'Processing file...',
+        'Validating content...',
+        'Generating embeddings...',
+        'Finalizing upload...'
+    ];
+    
+    let messageIndex = 0;
+    
+    // Clear any existing interval
+    if (window.progressInterval) {
+        clearInterval(window.progressInterval);
+    }
+    
+    window.progressInterval = setInterval(() => {
+        progress += Math.random() * 3 + 1; // Random increment between 1-4%
+        
+        // Update message every 15-20%
+        if (progress > messageIndex * 15 && messageIndex < messages.length - 1) {
+            messageIndex++;
+        }
+        
+        // Cap at 95% to leave room for completion
+        if (progress > 95) {
+            progress = 95;
+        }
+        
+        updateUploadProgress(Math.round(progress), messages[messageIndex]);
+    }, 800); // Update every 800ms for smooth progress
 }
 
 function disableModalInteractions() {
@@ -984,6 +1249,12 @@ function showUploadConfirmation(response, hasFileExists, hasQualityWarning) {
 }
 
 function resetUploadModal() {
+    // Clear any progress intervals
+    if (window.progressInterval) {
+        clearInterval(window.progressInterval);
+        window.progressInterval = null;
+    }
+    
     // Reset form
     $('#uploadForm')[0].reset();
     $('#uploadTagSelect').val(null).trigger('change');

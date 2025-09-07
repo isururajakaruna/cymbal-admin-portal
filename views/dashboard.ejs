@@ -128,15 +128,15 @@
             <% } else { %>
                 <% files.forEach(file => { %>
                     <div class="col-lg-4 col-md-6 mb-4">
-                        <div class="card file-card h-100">
+                        <div class="card file-card h-100" title="<%= file.name %>">
                             <div class="card-body">
                                 <div class="d-flex align-items-start mb-3">
                                     <div class="file-icon me-3" style="background: <%= getFileIconColor(file.file_type, file.name) %>">
                                         <i class="<%= getFileIcon(file.file_type, file.name) %>"></i>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <h6 class="card-title mb-1 text-truncate" title="<%= file.name %>">
-                                            <%= file.name %>
+                                        <h6 class="card-title mb-1">
+                                            <span class="file-name" title="<%= file.name %>"><%= file.name %></span>
                                         </h6>
                                         <small class="text-muted">
                                             <%= formatFileSize(file.size) %> • 
@@ -208,10 +208,72 @@
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
-                </div>
-            </div>
+    </div>
+</div>
 
-            <!-- Delete Confirmation Modal -->
+<!-- Replace File Modal -->
+<div class="modal fade" id="replaceModal" tabindex="-1" aria-labelledby="replaceModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="replaceModalLabel">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Replace File
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Replacing:</strong> <span id="replaceFileName"></span>
+                </div>
+                
+                <form id="replaceForm">
+                    <div class="mb-3">
+                        <label for="replaceFileInput" class="form-label">Select New File</label>
+                        <input type="file" class="form-control" id="replaceFileInput" accept=".pdf,.doc,.docx,.txt,.xlsx,.csv" required>
+                        <div class="form-text">Supported formats: PDF, DOC, DOCX, TXT, XLSX, CSV</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="replaceTagSelect" class="form-label">Tags (Optional)</label>
+                        <select id="replaceTagSelect" class="form-select" multiple>
+                            <option value="general">General</option>
+                            <option value="faq">FAQ</option>
+                            <option value="policy">Policy</option>
+                            <option value="procedure">Procedure</option>
+                            <option value="guide">Guide</option>
+                            <option value="reference">Reference</option>
+                        </select>
+                        <div class="form-text">Select or type new tags for the file</div>
+                    </div>
+                    
+                    <!-- Validation Results -->
+                    <div id="replaceValidationResults" class="mb-4" style="display: none;">
+                        <!-- Validation messages will be inserted here -->
+                    </div>
+                    
+                    <!-- Replace Progress -->
+                    <div id="replaceProgress" class="mb-4" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small class="text-muted" id="replaceStatus">Preparing replacement...</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="replaceFileBtn">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Replace File
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
             <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
