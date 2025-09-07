@@ -3,6 +3,7 @@ const session = require('express-session');
 const path = require('path');
 require('dotenv').config();
 const axios = require('axios');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -26,6 +27,14 @@ app.set('views', path.join(__dirname, 'views'));
 
 // RAG API base URL
 const RAG_API_BASE_URL = process.env.RAG_API_BASE_URL || 'http://localhost:8000';
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+});
 
 // Middleware to check authentication
 const requireAuth = (req, res, next) => {
@@ -239,6 +248,95 @@ app.get('/api/files/stats', requireAuth, async (req, res) => {
       success: false, 
       error: 'Failed to fetch file statistics' 
     });
+  }
+});
+
+// API route to validate file
+app.post('/api/files/validate', requireAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No file provided' 
+      });
+    }
+
+    // Prepare form data for RAG API
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
+    formData.append('replace_existing', req.body.replace_existing || 'false');
+
+    // Forward validation request to RAG API
+    const response = await axios.post(`${RAG_API_BASE_URL}/api/v1/file/validate`, formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('Error validating file:', error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to validate file' 
+      });
+    }
+  }
+});
+
+// API route to upload file
+app.post('/api/files/upload', requireAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No file provided' 
+      });
+    }
+
+    // Prepare form data for RAG API
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
+    formData.append('replace_existing', req.body.replace_existing || 'true');
+    
+    // Add tags if provided
+    if (req.body.tags) {
+      formData.append('tags', req.body.tags);
+    }
+
+    // Forward upload request to RAG API
+    const response = await axios.post(`${RAG_API_BASE_URL}/api/v1/upload/direct`, formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error('Error uploading file:', error.message);
+    if (error.response) {
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to upload file' 
+      });
+    }
   }
 });
 

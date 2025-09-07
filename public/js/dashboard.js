@@ -15,6 +15,9 @@ $(document).ready(function() {
             $('#deleteConfirmModal').modal('hide');
         }
     });
+    
+    // Initialize upload modal functionality
+    initializeUpload();
 });
 
 let allTags = [];
@@ -515,8 +518,10 @@ function performDelete(filename) {
             hideLoading();
             if (response.success) {
                 showToast(`File "${filename}" deleted successfully`, 'success');
-                // Reload the file list without full page reload
-                loadFiles();
+                // Reload the page to refresh all statistics and file list
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
             } else {
                 showToast(response.error || 'Failed to delete file', 'error');
             }
@@ -566,6 +571,433 @@ function loadFiles() {
 function replaceFile(filename) {
     // TODO: Implement file replace functionality
     showToast('Replace functionality coming soon', 'info');
+}
+
+// Upload functionality
+let validationData = null;
+
+function initializeUpload() {
+    // Initialize upload tag select2
+    $('#uploadTagSelect').select2({
+        data: allTags.map(tag => ({ id: tag, text: tag })),
+        tags: true,
+        maximumSelectionLength: 10,
+        tokenSeparators: [',', ' '],
+        placeholder: "Type or select tags...",
+        allowClear: true,
+        theme: 'bootstrap-5',
+        width: '100%'
+    });
+    
+    // Handle file selection
+    $('#fileInput').on('change', function() {
+        const file = this.files[0];
+        if (file) {
+            // Reset validation results
+            $('#validationResults').hide();
+            validationData = null;
+            // Enable upload button when file is selected
+            $('#uploadFileBtn').prop('disabled', false);
+        }
+    });
+    
+    // Handle upload file button (now handles both validation and upload)
+    $('#uploadFileBtn').on('click', function() {
+        // Check if we're in confirmation mode
+        if (window.pendingUploadResponse) {
+            // User confirmed, immediately lock modal and proceed with upload
+            disableModalInteractions();
+            performUpload();
+        } else {
+            // Normal upload flow
+            uploadFile();
+        }
+    });
+    
+    // Reset modal when closed
+    $('#uploadModal').on('hidden.bs.modal', function() {
+        resetUploadModal();
+    });
+    
+    // Ensure modal always has static backdrop and no keyboard
+    $('#uploadModal').modal({
+        backdrop: 'static',
+        keyboard: false
+    });
+}
+
+function validateFile() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showToast('Please select a file first', 'error');
+        return;
+    }
+    
+    showLoading();
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('replace_existing', 'false');
+    
+    $.ajax({
+        url: '/api/files/validate',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            hideLoading();
+            handleValidationResponse(response);
+        },
+        error: function(xhr, status, error) {
+            hideLoading();
+            console.error('Validation error:', error);
+            const errorMessage = xhr.responseJSON?.error || 'Failed to validate file';
+            showToast(errorMessage, 'error');
+        }
+    });
+}
+
+function handleValidationResponse(response) {
+    validationData = response;
+    
+    if (response.success) {
+        // Check for file existence warning
+        if (response.file_exists === true) {
+            displayFileExistsWarning(response);
+        }
+        
+        // Check content quality
+        const contentQuality = response.content_analysis?.content_quality;
+        
+        if (contentQuality && contentQuality.is_sufficient === false) {
+            // Show content quality warning
+            displayValidationWarning(contentQuality);
+            $('#uploadFileBtn').prop('disabled', true);
+        } else {
+            // Content is sufficient, show success and enable upload
+            displayValidationSuccess(response);
+            $('#uploadFileBtn').prop('disabled', false);
+        }
+    } else {
+        // Show error
+        displayValidationError(response);
+        $('#uploadFileBtn').prop('disabled', true);
+    }
+}
+
+function displayFileExistsWarning(response) {
+    const html = `
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>File Already Exists</strong>
+            <div class="mt-2">
+                <p class="mb-2">A file with the name "${response.filename}" already exists in the knowledge base.</p>
+                <small class="text-muted">
+                    <strong>Note:</strong> Uploading will replace the existing file. This action cannot be undone.
+                </small>
+            </div>
+        </div>
+    `;
+    
+    // Append to existing validation results or create new container
+    if ($('#validationResults').is(':visible')) {
+        $('#validationResults').append(html);
+    } else {
+        $('#validationResults').html(html).show();
+    }
+}
+
+function displayValidationSuccess(response) {
+    // Get quality score from content_analysis if available
+    const qualityScore = response.content_analysis?.content_quality?.score || response.quality_score || 'N/A';
+    
+    const html = `
+        <div class="alert alert-success" role="alert">
+            <i class="bi bi-check-circle me-2"></i>
+            <strong>File Validated Successfully!</strong>
+            <div class="mt-2">
+                <small class="text-muted">
+                    Quality Score: ${qualityScore}/10<br>
+                    File Size: ${formatFileSize(response.file_size)}<br>
+                    Content Type: ${response.content_type || 'Unknown'}
+                </small>
+            </div>
+        </div>
+    `;
+    
+    $('#validationResults').html(html).show();
+}
+
+function displayValidationWarning(contentQuality) {
+    const html = `
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Content Quality Warning</strong>
+            <div class="mt-2">
+                <p class="mb-2">${contentQuality.reasoning}</p>
+                <small class="text-muted">
+                    <strong>Score:</strong> ${contentQuality.score}/10<br>
+                    <strong>Suggestion:</strong> Please upload a file with more substantial content
+                </small>
+            </div>
+        </div>
+    `;
+    
+    $('#validationResults').html(html).show();
+}
+
+function displayValidationError(response) {
+    const html = `
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-x-circle me-2"></i>
+            <strong>Validation Failed</strong>
+            <div class="mt-2">
+                <p class="mb-2">${response.error}</p>
+                ${response.suggestion ? `<small class="text-muted"><strong>Suggestion:</strong> ${response.suggestion}</small>` : ''}
+            </div>
+        </div>
+    `;
+    
+    $('#validationResults').html(html).show();
+}
+
+function uploadFile() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showToast('Please select a file first', 'error');
+        return;
+    }
+    
+    // If not validated yet, validate first
+    if (!validationData) {
+        validateAndUpload();
+    } else if (validationData.success) {
+        // Already validated and successful, proceed with upload
+        performUpload();
+    } else {
+        // Validation failed, show error
+        showToast('File validation failed. Please select a different file.', 'error');
+    }
+}
+
+function validateAndUpload() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    
+    // Disable modal interactions and show loading
+    disableModalInteractions();
+    showLoading();
+    console.log('Starting validation for file:', file.name);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('replace_existing', 'false');
+    
+    $.ajax({
+        url: '/api/files/validate',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        xhrFields: {
+            withCredentials: true
+        },
+        success: function(response) {
+            console.log('Validation response:', response);
+            handleValidationResponse(response);
+            
+            // If validation is successful, check for warnings
+            if (response.success) {
+                const contentQuality = response.content_analysis?.content_quality;
+                const hasFileExists = response.file_exists === true;
+                const hasQualityWarning = contentQuality && contentQuality.is_sufficient === false;
+                
+                if (hasFileExists || hasQualityWarning) {
+                    // Show confirmation dialog for warnings
+                    enableModalInteractions();
+                    hideLoading();
+                    showUploadConfirmation(response, hasFileExists, hasQualityWarning);
+                } else {
+                    // No warnings, proceed with upload
+                    performUpload();
+                }
+            } else {
+                enableModalInteractions();
+                hideLoading();
+                showToast('File validation failed: ' + (response.error || 'Unknown error'), 'error');
+            }
+        },
+        error: function(xhr, status, error) {
+            enableModalInteractions();
+            hideLoading();
+            console.error('Validation error:', error);
+            console.error('Response:', xhr.responseText);
+            const errorMessage = xhr.responseJSON?.error || 'Failed to validate file';
+            showToast(errorMessage, 'error');
+        }
+    });
+}
+
+function performUpload() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    const selectedTags = $('#uploadTagSelect').val() || [];
+    
+    // Show upload progress (modal is already disabled)
+    $('#uploadProgress').show();
+    updateUploadProgress(0, 'Preparing upload...');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('replace_existing', 'true');
+    
+    if (selectedTags.length > 0) {
+        formData.append('tags', selectedTags.join(','));
+    }
+    
+    console.log('Starting upload for file:', file.name);
+    
+    $.ajax({
+        url: '/api/files/upload',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        xhrFields: {
+            withCredentials: true
+        },
+        xhr: function() {
+            const xhr = new window.XMLHttpRequest();
+            xhr.upload.addEventListener("progress", function(evt) {
+                if (evt.lengthComputable) {
+                    const percentComplete = Math.round((evt.loaded / evt.total) * 100);
+                    updateUploadProgress(percentComplete, `Uploading... ${percentComplete}%`);
+                }
+            }, false);
+            return xhr;
+        },
+        success: function(response) {
+            console.log('Upload success:', response);
+            updateUploadProgress(100, 'Upload completed!');
+            setTimeout(() => {
+                enableModalInteractions();
+                hideLoading();
+                $('#uploadModal').modal('hide');
+                showToast(`File "${response.filename}" uploaded successfully!`, 'success');
+                // Reload the page to refresh all statistics and file list
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }, 1000);
+        },
+        error: function(xhr, status, error) {
+            enableModalInteractions();
+            hideLoading();
+            $('#uploadProgress').hide();
+            console.error('Upload error:', error);
+            console.error('Response:', xhr.responseText);
+            const errorMessage = xhr.responseJSON?.error || 'Failed to upload file';
+            showToast(errorMessage, 'error');
+        }
+    });
+}
+
+function updateUploadProgress(percent, status) {
+    $('.progress-bar').css('width', percent + '%').attr('aria-valuenow', percent);
+    $('#uploadStatus').text(status);
+}
+
+function disableModalInteractions() {
+    // Disable all buttons and inputs in the upload modal
+    $('#uploadModal .btn').prop('disabled', true);
+    $('#uploadModal input, #uploadModal select').prop('disabled', true);
+    
+    // Add overlay to prevent clicking outside
+    $('#uploadModal .modal-content').addClass('processing');
+    
+    // Disable close button
+    $('#uploadModal .btn-close').prop('disabled', true).addClass('disabled');
+    
+    // Prevent modal from closing by intercepting hide events
+    $('#uploadModal').off('hide.bs.modal');
+    $('#uploadModal').on('hide.bs.modal', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    });
+}
+
+function enableModalInteractions() {
+    // Re-enable all buttons and inputs in the upload modal
+    $('#uploadModal .btn').prop('disabled', false);
+    $('#uploadModal input, #uploadModal select').prop('disabled', false);
+    
+    // Remove overlay
+    $('#uploadModal .modal-content').removeClass('processing');
+    
+    // Re-enable close button
+    $('#uploadModal .btn-close').prop('disabled', false).removeClass('disabled');
+    
+    // Remove hide event prevention
+    $('#uploadModal').off('hide.bs.modal');
+}
+
+function showUploadConfirmation(response, hasFileExists, hasQualityWarning) {
+    let warningMessages = [];
+    
+    if (hasFileExists) {
+        warningMessages.push(`<strong>File Already Exists:</strong> A file named "${response.filename}" already exists and will be replaced.`);
+    }
+    
+    if (hasQualityWarning) {
+        const contentQuality = response.content_analysis?.content_quality;
+        warningMessages.push(`<strong>Content Quality Warning:</strong> ${contentQuality?.reasoning || 'File content may not be suitable for the knowledge base.'}`);
+    }
+    
+    const warningText = warningMessages.join('<br><br>');
+    
+    const confirmMessage = `
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Upload Confirmation Required</strong>
+            <div class="mt-2">
+                ${warningText}
+                <br><br>
+                <strong>Do you want to continue with the upload?</strong>
+            </div>
+        </div>
+    `;
+    
+    // Show confirmation in validation results
+    $('#validationResults').html(confirmMessage).show();
+    
+    // Update upload button to show confirmation
+    $('#uploadFileBtn').html('<i class="bi bi-check-circle me-1"></i>Confirm Upload').removeClass('btn-primary').addClass('btn-warning');
+    
+    // Store the response for when user confirms
+    window.pendingUploadResponse = response;
+}
+
+function resetUploadModal() {
+    // Reset form
+    $('#uploadForm')[0].reset();
+    $('#uploadTagSelect').val(null).trigger('change');
+    
+    // Hide sections
+    $('#validationResults').hide();
+    $('#uploadProgress').hide();
+    
+    // Reset buttons
+    $('#uploadFileBtn').prop('disabled', false).html('<i class="bi bi-cloud-upload me-1"></i>Upload File').removeClass('btn-warning').addClass('btn-primary');
+    
+    // Clear data
+    validationData = null;
+    window.pendingUploadResponse = null;
 }
 
 function viewFileStats(filename) {

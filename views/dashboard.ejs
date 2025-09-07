@@ -19,9 +19,9 @@
                         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#searchModal">
                             <i class="bi bi-search me-2"></i>Search Files
                         </button>
-                        <a href="/upload" class="btn btn-primary btn-upload">
-                            <i class="bi bi-cloud-upload me-2"></i>Upload New File
-                        </a>
+                    <button class="btn btn-primary btn-upload" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="bi bi-cloud-upload me-2"></i>Upload New File
+                    </button>
                     </div>
                 </div>
             </div>
@@ -240,6 +240,67 @@
                             </button>
                             <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
                                 <i class="bi bi-trash me-1"></i>Delete File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload File Modal -->
+            <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title" id="uploadModalLabel">
+                                <i class="bi bi-cloud-upload me-2"></i>Upload New File
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="uploadForm" enctype="multipart/form-data">
+                                <!-- File Selection -->
+                                <div class="mb-4">
+                                    <label for="fileInput" class="form-label">
+                                        <i class="bi bi-file-earmark me-2"></i>Select File
+                                    </label>
+                                    <input type="file" class="form-control" id="fileInput" name="file" accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png" required>
+                                    <div class="form-text">
+                                        Supported formats: PDF, DOCX, XLSX, XLS, CSV, JPG, JPEG, PNG
+                                    </div>
+                                </div>
+
+                                <!-- Tags Input -->
+                                <div class="mb-4">
+                                    <label for="uploadTagSelect" class="form-label">
+                                        <i class="bi bi-tags me-2"></i>Tags (Optional)
+                                    </label>
+                                    <select class="form-control select2" id="uploadTagSelect" multiple="multiple" style="width: 100%;">
+                                    </select>
+                                    <small class="form-text text-muted">Add tags to help categorize and search this file</small>
+                                </div>
+
+                                <!-- Validation Results -->
+                                <div id="validationResults" class="mb-4" style="display: none;">
+                                    <!-- Content will be loaded here -->
+                                </div>
+
+                                <!-- Upload Progress -->
+                                <div id="uploadProgress" class="mb-4" style="display: none;">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <div class="text-center mt-2">
+                                        <small class="text-muted" id="uploadStatus">Preparing upload...</small>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle me-1"></i>Cancel
+                            </button>
+                            <button type="button" class="btn btn-primary" id="uploadFileBtn">
+                                <i class="bi bi-cloud-upload me-1"></i>Upload File
                             </button>
                         </div>
                     </div>

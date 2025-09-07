@@ -94,6 +94,29 @@
     color: rgba(255, 255, 255, 0.8);
 }
 
+/* Upload Modal Processing State */
+#uploadModal .modal-content.processing {
+    position: relative;
+    pointer-events: none;
+}
+
+#uploadModal .modal-content.processing::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 1000;
+    border-radius: var(--radius-lg);
+}
+
+#uploadModal .modal-content.processing .modal-body {
+    position: relative;
+    z-index: 1001;
+}
+
 /* Selected Tags Display (for the separate row) */
 .selected-tag {
     background: var(--primary-color);
