@@ -1,0 +1,123 @@
+.file-card {
+    transition: all var(--transition-normal);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+}
+
+.file-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-medium);
+    border-color: var(--google-blue);
+}
+
+.btn-upload {
+    background: var(--google-blue);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 12px 24px;
+    font-weight: 500;
+    transition: all var(--transition-normal);
+}
+
+.btn-upload:hover {
+    background: var(--google-blue-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(66, 133, 244, 0.3);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.loading-spinner {
+    display: none;
+}
+
+/* File Actions */
+.file-actions {
+    position: relative;
+    z-index: 10;
+}
+
+/* Dropdown Menu Z-Index Fix */
+.dropdown-menu {
+    z-index: 9999 !important;
+    position: absolute !important;
+}
+
+.file-card .dropdown-menu {
+    z-index: 10000 !important;
+    position: absolute !important;
+}
+
+/* Ensure dropdown container has proper positioning */
+.dropdown {
+    position: relative !important;
+}
+
+.file-actions .dropdown {
+    position: relative !important;
+    z-index: 10001 !important;
+}
+
+/* Select2 Custom Styling */
+.select2-container--bootstrap-5 .select2-selection--multiple {
+    min-height: 38px;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+    background-color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    border-radius: var(--radius-pill);
+    color: white;
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    margin: 2px;
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove {
+    color: white;
+    margin-right: 4px;
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Selected Tags Display (for the separate row) */
+.selected-tag {
+    background: var(--primary-color);
+    color: white;
+    border: 1px solid var(--primary-color);
+    border-radius: var(--radius-pill);
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    margin: 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.selected-tag .remove-tag {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    border-radius: 50%;
+    transition: background-color var(--transition-fast);
+}
+
+.selected-tag .remove-tag:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}

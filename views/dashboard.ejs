@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('partials/head', { title: 'Dashboard', cssFile: 'dashboard' }) %>
+</head>
+<body>
+    <%- include('partials/navbar') %>
+
+    <div class="container-fluid py-4">
+        <!-- Header Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-1">File Management</h2>
+                        <p class="text-muted mb-0">Manage your knowledge base files</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#searchModal">
+                            <i class="bi bi-search me-2"></i>Search Files
+                        </button>
+                        <a href="/upload" class="btn btn-primary btn-upload">
+                            <i class="bi bi-cloud-upload me-2"></i>Upload New File
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="row mb-4 justify-content-center">
+            <div class="col-md-3 col-lg-3">
+                <div class="stats-card">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="bi bi-files fs-1"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0"><%= files.length %></h4>
+                            <small class="opacity-75">Total Files</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-lg-3">
+                <div class="stats-card">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="bi bi-hdd-stack fs-1"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0"><%= formatFileSize(files.reduce((total, file) => total + (file.size || 0), 0)) %></h4>
+                            <small class="opacity-75">Total Size</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-lg-3">
+                <div class="stats-card">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="bi bi-tags fs-1"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0"><%= [...new Set(files.flatMap(f => f.tags || []))].length %></h4>
+                            <small class="opacity-75">Unique Tags</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="bi bi-search fs-1"></i>
+                        </div>
+                        <div>
+                            <a href="/search" class="text-white text-decoration-none">
+                                <h4 class="mb-0">Search</h4>
+                                <small class="opacity-75">Find Files</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div> -->
+        </div>
+
+        <!-- Error Alert -->
+        <% if (error) { %>
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <%= error %>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <% } %>
+
+        <!-- Filter Indicators -->
+        <div id="filterIndicators" class="row mb-3" style="display: none;">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-body py-2">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-funnel-fill text-primary me-2"></i>
+                            <span class="me-3"><strong>Filters Applied:</strong></span>
+                            <div id="activeFilters" class="d-flex flex-wrap gap-2 flex-grow-1"></div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="clearAllFilters">
+                                <i class="bi bi-x-circle me-1"></i>Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Files Grid -->
+        <div class="row" id="filesGrid">
+            <% if (files.length === 0) { %>
+                <div class="col-12">
+                    <div class="empty-state">
+                        <i class="bi bi-folder-x fs-1 text-muted mb-3"></i>
+                        <h4>No files found</h4>
+                        <p class="text-muted">Upload your first file to get started with the knowledge base.</p>
+                        <a href="/upload" class="btn btn-primary btn-upload">
+                            <i class="bi bi-cloud-upload me-2"></i>Upload File
+                        </a>
+                    </div>
+                </div>
+            <% } else { %>
+                <% files.forEach(file => { %>
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="card file-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex align-items-start mb-3">
+                                    <div class="file-icon me-3" style="background: <%= getFileIconColor(file.file_type, file.name) %>">
+                                        <i class="<%= getFileIcon(file.file_type, file.name) %>"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="card-title mb-1 text-truncate" title="<%= file.name %>">
+                                            <%= file.name %>
+                                        </h6>
+                                        <small class="text-muted">
+                                            <%= formatFileSize(file.size) %> • 
+                                            <%= formatDate(file.last_updated) %>
+                                        </small>
+                                    </div>
+                                    <div class="file-actions">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item" href="#" onclick="downloadFile('<%= file.name %>')">
+                                                    <i class="bi bi-download me-2"></i>Download
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="replaceFile('<%= file.name %>')">
+                                                    <i class="bi bi-arrow-clockwise me-2"></i>Replace
+                                                </a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteFile('<%= file.name %>')">
+                                                    <i class="bi bi-trash me-2"></i>Delete
+                                                </a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        <i class="bi bi-file-earmark me-1"></i>
+                                        <%= file.file_type || 'Unknown type' %>
+                                    </small>
+                                </div>
+                                
+                                <% if (file.tags && file.tags.length > 0) { %>
+                                    <div class="mb-2">
+                                        <% file.tags.forEach(tag => { %>
+                                            <span class="tag-badge"><%= tag %></span>
+                                        <% }); %>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="searchModalLabel">
+                        <i class="bi bi-search me-2"></i>Search Files
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="searchForm">
+                        <!-- Search Keywords -->
+                        <div class="mb-3">
+                            <label for="searchQuery" class="form-label">
+                                <i class="bi bi-search me-2"></i>Search Keywords
+                            </label>
+                            <input type="text" class="form-control" id="searchQuery" name="query" 
+                                   placeholder="Enter keywords to search in file names...">
+                        </div>
+
+                        <!-- Tag Selection -->
+                        <div class="mb-3">
+                            <label for="tagSelect" class="form-label">
+                                <i class="bi bi-tags me-2"></i>Filter by Tags
+                            </label>
+                            <select class="form-control select2" id="tagSelect" multiple="multiple" style="width: 100%;">
+                            </select>
+                            <small class="form-text text-muted">Type tag names or select from existing tags</small>
+                        </div>
+
+                        <!-- Search Button -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-2"></i>Search Files
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner position-fixed top-50 start-50 translate-middle">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <%- include('partials/scripts', { jsFile: 'dashboard' }) %>
+</body>
+</html>
+
+<% 
+function getFileIcon(fileType, fileName) {
+    // Check filename extension first (more reliable)
+    if (fileName) {
+        const ext = fileName.toLowerCase().split('.').pop();
+        if (ext === 'xlsx' || ext === 'xls') return 'bi-file-excel';
+        if (ext === 'csv') return 'bi-file-excel';
+        if (ext === 'pdf') return 'bi-file-pdf';
+        if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'bmp') return 'bi-file-image';
+        if (ext === 'docx' || ext === 'doc') return 'bi-file-word';
+        if (ext === 'txt') return 'bi-file-text';
+    }
+    
+    // Fallback to file type if no filename or no extension match
+    if (!fileType) return 'bi-file-earmark';
+    
+    // Convert to lowercase for case-insensitive comparison
+    const type = fileType.toLowerCase();
+    
+    if (type.includes('pdf')) return 'bi-file-pdf';
+    if (type.includes('image')) return 'bi-file-image';
+    if (type.includes('word') || type.includes('document')) return 'bi-file-word';
+    if (type.includes('excel') || type.includes('spreadsheet') || type.includes('xlsx') || type.includes('xls') || type.includes('.xlsx') || type.includes('.xls')) return 'bi-file-excel';
+    if (type.includes('csv') || type.includes('.csv')) return 'bi-file-excel';
+    if (type.includes('text')) return 'bi-file-text';
+    
+    return 'bi-file-earmark';
+}
+
+function getFileIconColor(fileType, fileName) {
+    // Check filename extension first (more reliable)
+    if (fileName) {
+        const ext = fileName.toLowerCase().split('.').pop();
+        if (ext === 'xlsx' || ext === 'xls') return '#34a853'; // Excel green
+        if (ext === 'csv') return '#34a853'; // Excel green
+        if (ext === 'pdf') return '#ea4335'; // PDF red
+        if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'bmp') return '#34a853'; // Image green
+        if (ext === 'docx' || ext === 'doc') return '#4285f4'; // Word blue
+        if (ext === 'txt') return '#5f6368'; // Text gray
+    }
+    
+    // Fallback to file type if no filename or no extension match
+    if (!fileType) return '#9aa0a6';
+    
+    // Convert to lowercase for case-insensitive comparison
+    const type = fileType.toLowerCase();
+    
+    if (type.includes('pdf')) return '#ea4335';
+    if (type.includes('image')) return '#34a853';
+    if (type.includes('word') || type.includes('document')) return '#4285f4';
+    if (type.includes('excel') || type.includes('spreadsheet') || type.includes('xlsx') || type.includes('xls') || type.includes('.xlsx') || type.includes('.xls')) return '#34a853';
+    if (type.includes('csv') || type.includes('.csv')) return '#34a853';
+    if (type.includes('text')) return '#5f6368';
+    
+    return '#9aa0a6';
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'Unknown date';
+    
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+}
+%>
