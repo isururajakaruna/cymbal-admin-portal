@@ -29,17 +29,15 @@ app.set('views', path.join(__dirname, 'views'));
 const RAG_API_BASE_URL = process.env.RAG_API_BASE_URL || 'http://localhost:8000';
 const API_AUTH_TOKEN = process.env.API_AUTH_TOKEN;
 
-// RAG API headers with token authentication
-const getRAGAPIHeaders = () => {
-  const headers = {
-    'Content-Type': 'application/json'
-  };
+// RAG API authentication helper
+const getRAGAPIAuth = () => {
+  const auth = {};
   
   if (API_AUTH_TOKEN) {
-    headers['Authorization'] = `Bearer ${API_AUTH_TOKEN}`;
+    auth.token = API_AUTH_TOKEN;
   }
   
-  return headers;
+  return auth;
 };
 
 // Configure multer for file uploads
@@ -117,9 +115,9 @@ app.get('/dashboard', requireAuth, async (req, res) => {
         sort_by: 'date',
         limit: 50,
         offset: 0,
-        search: ''
-      },
-      headers: getRAGAPIHeaders()
+        search: '',
+        ...getRAGAPIAuth()
+      }
     });
 
     const files = response.data.files || [];
@@ -149,8 +147,10 @@ app.get('/api/files', requireAuth, async (req, res) => {
     }
 
     const response = await axios.get(`${RAG_API_BASE_URL}/api/v1/files/list`, { 
-      params,
-      headers: getRAGAPIHeaders()
+      params: {
+        ...params,
+        ...getRAGAPIAuth()
+      }
     });
 
     res.json(response.data);
@@ -177,9 +177,11 @@ app.get('/api/files/download', requireAuth, async (req, res) => {
 
     // Forward the download request to RAG API
     const response = await axios.get(`${RAG_API_BASE_URL}/api/v1/files/view`, {
-      params: { filename },
-      responseType: 'stream',
-      headers: getRAGAPIHeaders()
+      params: { 
+        filename,
+        ...getRAGAPIAuth()
+      },
+      responseType: 'stream'
     });
 
     // Set appropriate headers for file download
@@ -228,8 +230,10 @@ app.delete('/api/files/delete', requireAuth, async (req, res) => {
 
     // Forward the delete request to RAG API
     const response = await axios.delete(`${RAG_API_BASE_URL}/api/v1/upload/delete`, {
-      params: { filename },
-      headers: getRAGAPIHeaders()
+      params: { 
+        filename,
+        ...getRAGAPIAuth()
+      }
     });
 
     res.json(response.data);
@@ -257,8 +261,10 @@ app.get('/api/files/stats', requireAuth, async (req, res) => {
 
     // Forward the stats request to RAG API
     const response = await axios.get(`${RAG_API_BASE_URL}/api/v1/files/embedding-stats`, {
-      params: { filename },
-      headers: getRAGAPIHeaders()
+      params: { 
+        filename,
+        ...getRAGAPIAuth()
+      }
     });
 
     res.json(response.data);
@@ -293,10 +299,10 @@ app.post('/api/files/validate', requireAuth, upload.single('file'), async (req, 
 
     // Forward validation request to RAG API
     const response = await axios.post(`${RAG_API_BASE_URL}/api/v1/file/validate`, formData, {
+      params: getRAGAPIAuth(),
       headers: {
         ...formData.getHeaders(),
-        'Content-Type': 'multipart/form-data',
-        ...getRAGAPIHeaders()
+        'Content-Type': 'multipart/form-data'
       }
     });
 
@@ -341,10 +347,10 @@ app.post('/api/files/upload', requireAuth, upload.single('file'), async (req, re
 
     // Forward upload request to RAG API
     const response = await axios.post(`${RAG_API_BASE_URL}/api/v1/upload/direct`, formData, {
+      params: getRAGAPIAuth(),
       headers: {
         ...formData.getHeaders(),
-        'Content-Type': 'multipart/form-data',
-        ...getRAGAPIHeaders()
+        'Content-Type': 'multipart/form-data'
       }
     });
 
@@ -368,8 +374,10 @@ app.delete('/api/files/:filename', requireAuth, async (req, res) => {
   try {
     const { filename } = req.params;
     const response = await axios.delete(`${RAG_API_BASE_URL}/api/v1/upload/delete`, {
-      params: { filename },
-      headers: getRAGAPIHeaders()
+      params: { 
+        filename,
+        ...getRAGAPIAuth()
+      }
     });
 
     res.json(response.data);
