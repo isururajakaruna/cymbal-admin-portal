@@ -10,6 +10,16 @@ A modern admin portal for managing files in a RAG (Retrieval-Augmented Generatio
 - **Modern UI**: Clean, responsive design with Bootstrap 5 and Google Material Design colors
 - **RAG Integration**: Connects to RAG API for file operations
 
+## Screenshots
+
+### Dashboard View
+![Dashboard](docs/dashboard.png)
+*Main dashboard showing file statistics, file grid with metadata, and search functionality*
+
+### File Upload Modal
+![File Upload](docs/upload.png)
+*File upload modal with tag selection, validation, and progress tracking*
+
 ## Tech Stack
 
 - **Backend**: Node.js, Express.js
@@ -67,10 +77,21 @@ The application will be available at `http://localhost:3003`
 ## Features Overview
 
 ### Dashboard
+The main dashboard (see screenshot above) provides:
 - File statistics (total files, size, unique tags)
 - File grid with icons and metadata
 - Search and filter functionality
 - File actions (download, replace, delete)
+- Real-time file management
+
+### File Upload
+The upload modal (see screenshot above) includes:
+- File selection with drag-and-drop support
+- Tag selection using Select2 with autocomplete
+- File validation with quality scoring
+- Progress tracking with realistic time estimates
+- Content quality warnings and file existence alerts
+- Replace functionality for existing files
 
 ### Search Modal
 - Search by filename keywords
@@ -80,10 +101,10 @@ The application will be available at `http://localhost:3003`
 
 ### File Management
 - View file details and metadata
-- Download files
-- Replace existing files
-- Delete files
-- Tag-based organization
+- Download files with proper filename handling
+- Replace existing files with two-step process
+- Delete files with confirmation modal
+- Tag-based organization and filtering
 
 ## Development
 
@@ -131,11 +152,13 @@ The application integrates with a RAG API that provides:
 ## Future Improvements
 
 - [ ] Add pagination for large file lists
-- [ ] Implement file upload functionality
+- [x] ~~Implement file upload functionality~~ ✅ **Completed**
 - [ ] Add more sorting options
 - [ ] Implement user management
 - [ ] Add file preview functionality
 - [ ] Implement bulk operations
+- [ ] Add file versioning
+- [ ] Implement audit logging
 
 ## License
 
