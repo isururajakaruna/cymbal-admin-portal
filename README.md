@@ -160,18 +160,3 @@ The application integrates with a RAG API that provides:
 - [ ] Add file versioning
 - [ ] Implement audit logging
 
-## License
-
-This project is part of the Cymbal RAG system and is intended for internal use.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## Support
-
-For issues and questions, please contact the development team.
